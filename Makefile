@@ -1,5 +1,6 @@
 CC=gcc
-CFLAGS+=-Wall -Wextra -std=c11 -pedantic -g "-lpthread"
+CFLAGS+=-Wall -Wextra -std=c11 -pedantic -g
+LIBS+= -lpthread
 
 selvaggi: selvaggi.o
 
