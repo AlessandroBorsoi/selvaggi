@@ -3,33 +3,39 @@
 #include <pthread.h>
 #include "upo_semaphore.h"
 
+int pentola, cucinato;
 upo_sem_t mutex, empty, full;
 
-void cucina(int* pasti_da_cucinare) 
+void cucina() 
 {
-    printf("Cucino pasto %d\n", *pasti_da_cucinare);
+    printf("Cucino pasto\n");
     fflush(stdout);
-    (*pasti_da_cucinare)--;
+    pentola++;
 }
 
 void mangia()
 {
     printf("Selvaggio mangia\n");
     fflush(stdout);
+    pentola--;
 }
 
 void* cuoco(void* args)
 {
-    int pasti_da_cucinare = *(int*)args;
-    printf("Cuoco creato\n");
-    do
+    printf("Cuoco svegliato\n");
+    int porzioni = *(int*)args;
+    upo_sem_wait(&mutex);
+    if (pentola == 0)
     {
-        upo_sem_wait(&empty);
-        upo_sem_wait(&mutex);
-        cucina(&pasti_da_cucinare);
-        upo_sem_post(&mutex);
-	    upo_sem_post(&full);
-    } while (pasti_da_cucinare);
+        for (int i = 0; i < porzioni; ++i)
+        {
+            upo_sem_wait(&empty);
+            cucina();
+            upo_sem_post(&full);
+        }
+        cucinato++;
+    }
+    upo_sem_post(&mutex);
     return NULL;
 }
 
@@ -39,6 +45,9 @@ void* selvaggio(void* args)
     printf("Selvaggio creato\n");
     for (int i = 0; i < porzioni; ++i)
     {
+        pthread_t t;
+        pthread_create(&t, NULL, cuoco, &porzioni);
+        pthread_join(t, NULL);
         upo_sem_wait(&full);
   	    upo_sem_wait(&mutex);
   	    mangia();
@@ -58,16 +67,17 @@ int main(int argc, char* argv[])
     selvaggi = atoi(argv[1]);
     porzioni = atoi(argv[2]);
     pasti = atoi(argv[3]);
+    pentola = 0;
+    cucinato = 0;
     upo_sem_init(&mutex, 1);
     upo_sem_init(&empty, porzioni);
     upo_sem_init(&full, 0);
-    pthread_t t[selvaggi + 1];
-    int pasti_da_cucinare = selvaggi * pasti;
+    pthread_t t[selvaggi];
     for (i = 0; i < selvaggi; ++i)
     {
         pthread_create(&t[i], NULL, selvaggio, &porzioni);
+        pthread_join(t[i], NULL);
     }
-    pthread_create(&t[i], NULL, cuoco, &pasti_da_cucinare);
-    pthread_join(t[i], NULL);
+    printf("Il cuoco ha cucinato %d volte\n", cucinato);
     return 0;
 }
