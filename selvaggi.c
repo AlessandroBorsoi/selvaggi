@@ -1,63 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#ifdef __APPLE__
-/*
-http://stackoverflow.com/questions/27736618/why-are-sem-init-sem-getvalue-sem-destroy-deprecated-on-mac-os-x-and-w
-*/
-#include <dispatch/dispatch.h>
-#else
-#include <semaphore.h>
-#endif
+#include "upo_semaphore.h"
 
-struct upo_sem {
-#ifdef __APPLE__
-    dispatch_semaphore_t sem;
-#else
-    sem_t sem;
-#endif
-};
+upo_sem_t mutex, empty, full;
 
-static inline void
-upo_sem_init(struct upo_sem* semaphore, int value)
+void cucina(int* pasti_da_cucinare) 
 {
-#ifdef __APPLE__
-    dispatch_semaphore_t* sem = &semaphore->sem;
-    *sem = dispatch_semaphore_create(value);
-#else
-    sem_init(&semaphore->sem, 0, value);
-#endif
-}
-
-static inline void
-upo_sem_wait(struct upo_sem* semaphore)
-{
-#ifdef __APPLE__
-    dispatch_semaphore_wait(semaphore->sem, DISPATCH_TIME_FOREVER);
-#else
-    int r;
-    do {
-        r = sem_wait(&semaphore->sem);
-    } while (r == -1 && errno == EINTR);
-#endif
-}
-
-static inline void
-upo_sem_post(struct upo_sem* semaphore)
-{
-#ifdef __APPLE__
-    dispatch_semaphore_signal(semaphore->sem);
-#else
-    sem_post(&semaphore->sem);
-#endif
-}
-
-struct upo_sem mutex, empty, full;
-
-void cucina() 
-{
-    printf("Cucino\n");
+    printf("Cucino pasto %d\n", *pasti_da_cucinare);
     fflush(stdout);
+    (*pasti_da_cucinare)--;
 }
 
 void mangia()
@@ -68,22 +20,24 @@ void mangia()
 
 void* cuoco(void* args)
 {
+    int pasti_da_cucinare = *(int*)args;
     printf("Cuoco creato\n");
-    for (int i = 0; i < 5; i++)
+    do
     {
         upo_sem_wait(&empty);
         upo_sem_wait(&mutex);
-        cucina();
+        cucina(&pasti_da_cucinare);
         upo_sem_post(&mutex);
 	    upo_sem_post(&full);
-    }
+    } while (pasti_da_cucinare);
     return NULL;
 }
 
 void* selvaggio(void* args)
 {
+    int porzioni = *(int*)args;
     printf("Selvaggio creato\n");
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < porzioni; ++i)
     {
         upo_sem_wait(&full);
   	    upo_sem_wait(&mutex);
@@ -108,11 +62,12 @@ int main(int argc, char* argv[])
     upo_sem_init(&empty, porzioni);
     upo_sem_init(&full, 0);
     pthread_t t[selvaggi + 1];
+    int pasti_da_cucinare = selvaggi * pasti;
     for (i = 0; i < selvaggi; ++i)
     {
-        pthread_create(&t[i], NULL, selvaggio, NULL);
+        pthread_create(&t[i], NULL, selvaggio, &porzioni);
     }
-    pthread_create(&t[i], NULL, cuoco, NULL);
+    pthread_create(&t[i], NULL, cuoco, &pasti_da_cucinare);
     pthread_join(t[i], NULL);
     return 0;
 }
