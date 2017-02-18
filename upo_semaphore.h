@@ -10,7 +10,6 @@ void upo_sem_wait(upo_sem_t* semaphore);
 void upo_sem_post(upo_sem_t* semaphore);
 
 #ifdef __APPLE__
-// http://stackoverflow.com/questions/27736618/why-are-sem-init-sem-getvalue-sem-destroy-deprecated-on-mac-os-x-and-w
 #include <dispatch/dispatch.h>
 
 struct upo_sem_s 
