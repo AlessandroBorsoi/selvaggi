@@ -5,6 +5,8 @@
 
 struct shared_s
 {
+    upo_sem_t mutex;
+    upo_sem_t full;
     int pasti_in_pentola;
     int pasti_cucinati;
     int pasti_da_effettuare;
@@ -15,28 +17,25 @@ struct shared_s
 
 typedef struct shared_s* shared_t;
 
-upo_sem_t mutex, empty, full;
-
 void* cuoco(void* args)
 {
     shared_t shared = (shared_t)args;
     while (shared->cucina)
     {
-  	    upo_sem_wait(&mutex);
+  	    upo_sem_wait(&shared->mutex);
         if (shared->pasti_in_pentola == 0)
         {
             printf("Cuoco svegliato\n");
             for (int i = 0; i < shared->porzioni; ++i)
             {
-                upo_sem_wait(&empty);
                 printf("Cucino la porzione %d\n", i + 1);
                 fflush(stdout);
                 shared->pasti_in_pentola++;
-                upo_sem_post(&full);
+                upo_sem_post(&shared->full);
             }
             shared->pasti_cucinati++;
         }
-  	    upo_sem_post(&mutex);
+  	    upo_sem_post(&shared->mutex);
     }
     return NULL;
 }
@@ -48,14 +47,13 @@ void* selvaggio(void* args)
     printf("Selvaggio creato\n");
     for (int i = 0; i < shared->pasti_da_effettuare; ++i)
     {
-        upo_sem_wait(&full);
-  	    upo_sem_wait(&mutex);
+        upo_sem_wait(&shared->full);
+  	    upo_sem_wait(&shared->mutex);
         if (id == 0) id = ++shared->id_selvaggio;
         printf("Selvaggio %d mangia la porzione: %d/%d\n", id, i + 1, shared->pasti_da_effettuare);
         fflush(stdout);
         shared->pasti_in_pentola--;
-  	    upo_sem_post(&mutex);
-  	    upo_sem_post(&empty);
+  	    upo_sem_post(&shared->mutex);
     }
     return NULL;
 }
@@ -71,11 +69,9 @@ int main(int argc, char* argv[])
     porzioni = atoi(argv[2]);
     pasti = atoi(argv[3]);
 
-    upo_sem_init(&mutex, 1);
-    upo_sem_init(&empty, porzioni);
-    upo_sem_init(&full, 0);
-
     shared_t shared = malloc(sizeof(struct shared_s));
+    upo_sem_init(&shared->mutex, 1);
+    upo_sem_init(&shared->full, 0);
     shared->pasti_in_pentola = 0;
     shared->pasti_cucinati = 0;
     shared->pasti_da_effettuare = pasti;
@@ -91,9 +87,9 @@ int main(int argc, char* argv[])
     for (i = 0; i < selvaggi; ++i)
         pthread_join(t[i], NULL);
 
-    upo_sem_wait(&mutex);
+    upo_sem_wait(&shared->mutex);
     shared->cucina = 0;
-    upo_sem_post(&mutex);
+    upo_sem_post(&shared->mutex);
 
     pthread_join(t[i], NULL);
 
