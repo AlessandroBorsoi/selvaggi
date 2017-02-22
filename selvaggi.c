@@ -7,10 +7,10 @@ struct shared_s
 {
     upo_sem_t mutex;
     upo_sem_t full;
+    int porzioni;
+    int pasti_da_effettuare;
     int pasti_in_pentola;
     int pasti_cucinati;
-    int pasti_da_effettuare;
-    int porzioni;
     int cucina;
     int id_selvaggio;
 };
@@ -19,6 +19,7 @@ typedef struct shared_s* shared_t;
 
 void* cuoco(void* args)
 {
+    printf("Cuoco creato\n");
     shared_t shared = (shared_t)args;
     while (shared->cucina)
     {
@@ -72,10 +73,10 @@ int main(int argc, char* argv[])
     shared_t shared = malloc(sizeof(struct shared_s));
     upo_sem_init(&shared->mutex, 1);
     upo_sem_init(&shared->full, 0);
+    shared->porzioni = porzioni;
+    shared->pasti_da_effettuare = pasti;
     shared->pasti_in_pentola = 0;
     shared->pasti_cucinati = 0;
-    shared->pasti_da_effettuare = pasti;
-    shared->porzioni = porzioni;
     shared->cucina = 1;
     shared->id_selvaggio = 0;
 
